@@ -1,0 +1,9 @@
+.aider*
+.claude
+
+_volumes/*
+
+**/node_modules
+**/dist
+
+.env

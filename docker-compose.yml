@@ -1,0 +1,65 @@
+
+services:
+
+      
+  api:
+    build: ./images/api
+    container_name: "${PROJECT_NAME}-api"
+    ports:
+      - 3000:3000
+    environment:
+      POSTGRES_USER:
+      POSTGRES_DATABASE: "postgres"
+      POSTGRES_PASSWORD:
+      POSTGRES_HOST: db
+      JWT_SECRET:
+    volumes:
+      - ./images/api/src:/usr/app/src
+      - ./_volumes/uploads:/usr/app/src/__uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  frontend:
+    build: ./images/frontend
+    container_name: "${PROJECT_NAME}-frontend"
+    ports:
+      - 3001:3001
+    environment:
+      REACT_APP_API_URL: http://localhost:3000
+    volumes:
+      - ./images/frontend/src:/app/src
+      - ./images/frontend/public:/app/public
+    depends_on:
+      - api
+    networks:
+      - backend
+
+  db:
+    image: "postgres:latest"
+    container_name: "${PROJECT_NAME}-db"
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER:
+      POSTGRES_DATABASE:
+      POSTGRES_DB: POSTGRES_DATABASE
+      POSTGRES_PASSWORD:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d postgres -U admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./_volumes/pg:/var/lib/postgresql/
+    networks:
+      - backend
+
+
+
+networks:
+  backend:
+    # Specify driver options
+    driver: bridge
