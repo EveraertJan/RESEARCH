@@ -128,7 +128,6 @@ const Sketches = ({ projectId, user }) => {
   return (
     <div className="sketches">
       <div className="sketches-header">
-        <h3>Sketches</h3>
         <button 
           onClick={() => setShowAddForm(true)}
           className="add-item-btn"

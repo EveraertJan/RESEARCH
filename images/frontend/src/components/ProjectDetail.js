@@ -7,6 +7,7 @@ import 'react-quill/dist/quill.snow.css';
 import ResearchFindings from './ResearchFindings';
 import Inspiration from './Inspiration';
 import Sketches from './Sketches';
+import Technologies from './Technologies';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -272,6 +273,8 @@ const ProjectDetail = () => {
             <Inspiration projectId={id} user={user} />
           ) : activeSection === 'sketches' ? (
             <Sketches projectId={id} user={user} />
+          ) : activeSection === 'technologies' ? (
+            <Technologies projectId={id} user={user} />
           ) : editingSection === activeSection ? (
             <div className="section-editor">
               <ReactQuill

@@ -7,6 +7,7 @@ const project_routes = require('./routes/projects')
 const research_routes = require('./routes/research')
 const inspiration_routes = require('./routes/inspiration')
 const sketches_routes = require('./routes/sketches')
+const technologies_routes = require('./routes/technologies')
 const { join } = require('node:path');
 const path = require('path');
 
@@ -29,6 +30,7 @@ app.use('/projects', project_routes);
 app.use('/research', research_routes);
 app.use('/inspiration', inspiration_routes);
 app.use('/sketches', sketches_routes);
+app.use('/technologies', technologies_routes);
 
 
 
