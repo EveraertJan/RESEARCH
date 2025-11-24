@@ -25,6 +25,7 @@
 - Error handling with try-catch blocks and proper HTTP status codes
 - Input validation using Joi or similar libraries
 - Use environment variables for configuration
+- Use UUID for identification in database
 
 ### Project Structure
 - API: src/, src/db/, src/helpers/, src/routes/
