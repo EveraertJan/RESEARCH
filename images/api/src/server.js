@@ -1,46 +1,40 @@
-const http = require('http');
-const { createServer } = require('http');
 const express = require('express');
-const cors = require("cors")
-const user_routes = require('./routes/user')
-const project_routes = require('./routes/projects')
-const research_routes = require('./routes/research')
-const inspiration_routes = require('./routes/inspiration')
-const sketches_routes = require('./routes/sketches')
-const technologies_routes = require('./routes/technologies')
-const { join } = require('node:path');
+const { createServer } = require('http');
+const cors = require('cors');
 const path = require('path');
+const { errorHandler } = require('./middleware/errorHandler');
 
+const user_routes = require('./routes/user');
+const project_routes = require('./routes/projects');
+const stack_routes = require('./routes/stacks');
+const insight_routes = require('./routes/insights');
+const chat_routes = require('./routes/chat');
+const tag_routes = require('./routes/tags');
 
 const app = express();
-
 const server = createServer(app);
+
+const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
 app.use('/uploads', express.static(path.join(__dirname, './__uploads')));
 
+app.get('/', (req, res) => {
+  res.json({
+    status: 'success',
+    message: 'API is running',
+    version: '2.0.0'
+  });
+});
 
-const port = 3000;
-
-app.use(cors());
 app.use('/users', user_routes);
 app.use('/projects', project_routes);
-app.use('/research', research_routes);
-app.use('/inspiration', inspiration_routes);
-app.use('/sketches', sketches_routes);
-app.use('/technologies', technologies_routes);
+app.use('/stacks', stack_routes);
+app.use('/insights', insight_routes);
+app.use('/chat', chat_routes);
+app.use('/tags', tag_routes);
 
-
-
-app.get('/', (req, res) => {
-  res.send("running")
-})
-
-
-
-
-
+app.use(errorHandler);
 
 module.exports = app;

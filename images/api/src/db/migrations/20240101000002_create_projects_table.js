@@ -4,12 +4,12 @@
  */
 exports.up = function(knex) {
   return knex.schema.createTable('projects', (table) => {
-    table.increments('id').primary();
+    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.string('name').notNullable();
     table.string('client');
     table.date('deadline');
-    table.integer('owner_id').unsigned().notNullable();
-    table.foreign('owner_id').references('id').inTable('users').onDelete('CASCADE');
+    table.uuid('owner_id').notNullable();
+    table.foreign('owner_id').references('users.id').onDelete('CASCADE');
     table.timestamps(true, true);
   });
 };
