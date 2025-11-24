@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "prod": "node src/index.js",
+    "prod": "npm run migrate && node src/index.js",
     "start": "npm run migrate && nodemon --legacy-watch src/index.js",
     "migrate": "knex migrate:latest --cwd src/db",
     "test-watch": "jest --watchAll --detectOpenHandles",

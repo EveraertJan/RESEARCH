@@ -26,6 +26,7 @@ services:
       - backend
     restart: unless-stopped
 
+
   frontend:
     image: tastbaar/research-frontend:latest
     container_name: frontend
@@ -34,12 +35,14 @@ services:
     networks:
       - backend
     restart: unless-stopped
+    ports:
+      - 8081:80
     labels:
       - "traefik.enable=true"
       # HTTP router (for initial setup and ACME challenge)
       - "traefik.http.routers.frontend-http.rule=Host(`research.${DOMAIN}`)"
       - "traefik.http.routers.frontend-http.entrypoints=web"
-      - "traefik.http.routers.frontend-http.service=student"
+      - "traefik.http.routers.frontend-http.service=frontend"
       # HTTPS router
       - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
@@ -55,12 +58,14 @@ services:
     image: tastbaar/research-static:latest
     container_name: static
     restart: unless-stopped
+    ports:
+      - 8080:80
     labels:
       - "traefik.enable=true"
       # HTTP router (for initial setup and ACME challenge)
       - "traefik.http.routers.static-http.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.static-http.entrypoints=web"
-      - "traefik.http.routers.static-http.service=student"
+      - "traefik.http.routers.static-http.service=static"
       # HTTPS router
       - "traefik.http.routers.static.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.static.entrypoints=websecure"
@@ -95,6 +100,8 @@ services:
     networks:
       - backend
     restart: unless-stopped
+    ports:
+      - 3000:3000
     labels:
       - "traefik.enable=true"
       # HTTP router (for initial setup and ACME challenge)
@@ -127,6 +134,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    ports:
+      - 5432:5432
 
 
 
