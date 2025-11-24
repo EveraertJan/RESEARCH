@@ -1,108 +1,236 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import ResearchFindings from './ResearchFindings';
-import Inspiration from './Inspiration';
-import Sketches from './Sketches';
-import Technologies from './Technologies';
+import { projectAPI, stackAPI, chatAPI, insightAPI, tagAPI } from '../services/api';
+
+const COLOR_PALETTE = [
+  { name: 'Red', value: '#FF3B30' },
+  { name: 'Orange', value: '#FF9500' },
+  { name: 'Yellow', value: '#FFCC00' },
+  { name: 'Green', value: '#34C759' },
+  { name: 'Blue', value: '#007AFF' },
+  { name: 'Purple', value: '#AF52DE' },
+  { name: 'Gray', value: '#8E8E93' }
+];
+
+const ColorSquare = ({ color1, color2, size = 16 }) => {
+  if (!color2) {
+    return (
+      <span
+        className="color-square"
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          backgroundColor: color1
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      className="color-square dual"
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        background: `linear-gradient(to top right, ${color1} 0%, ${color1} 50%, ${color2} 50%, ${color2} 100%)`
+      }}
+    />
+  );
+};
 
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const messagesEndRef = useRef(null);
+
   const [project, setProject] = useState(null);
+  const [stacks, setStacks] = useState([]);
+  const [currentStack, setCurrentStack] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [insights, setInsights] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [messageInput, setMessageInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState('research');
-  const [editingSection, setEditingSection] = useState(null);
-  const [sectionContent, setSectionContent] = useState('');
-  const [showCollaborators, setShowCollaborators] = useState(false);
-  const [collaborators, setCollaborators] = useState([]);
-  const [newCollaborator, setNewCollaborator] = useState({ email: '', role: 'collaborator' });
+  const [error, setError] = useState('');
+  const [showCollaboratorModal, setShowCollaboratorModal] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [showAddTagModal, setShowAddTagModal] = useState(false);
+  const [selectedInsight, setSelectedInsight] = useState(null);
+  const [collaboratorEmail, setCollaboratorEmail] = useState('');
+  const [newTag, setNewTag] = useState({ name: '', color1: '#007AFF', color2: null });
 
   useEffect(() => {
-    fetchProject();
+    fetchProjectData();
   }, [id]);
 
   useEffect(() => {
-    if (showCollaborators && project) {
-      fetchCollaborators();
+    if (currentStack) {
+      fetchMessages();
+      fetchInsights();
     }
-  }, [showCollaborators, project]);
+  }, [currentStack]);
 
-  const fetchProject = async () => {
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const fetchProjectData = async () => {
     try {
-      const response = await axios.get(process.env.REACT_APP_API_URL + `/projects/${id}`);
-      setProject(response.data);
-    } catch (error) {
-      console.error('Error fetching project:', error);
-      navigate('/dashboard');
+      const [projectRes, stacksRes, tagsRes] = await Promise.all([
+        projectAPI.getById(id),
+        stackAPI.getByProject(id),
+        tagAPI.getByProject(id)
+      ]);
+
+      setProject(projectRes.data.project);
+      setStacks(stacksRes.data.stacks || []);
+      setTags(tagsRes.data.tags || []);
+
+      if (stacksRes.data.stacks?.length > 0) {
+        setCurrentStack(stacksRes.data.stacks[0]);
+      }
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSectionEdit = (sectionType) => {
-    const section = project.sections.find(s => s.section_type === sectionType);
-    setEditingSection(sectionType);
-    setSectionContent(section?.content || '');
-  };
-
-  const handleSectionSave = async () => {
+  const fetchMessages = async () => {
+    if (!currentStack) return;
     try {
-      await axios.put(
-        process.env.REACT_APP_API_URL + `/projects/${id}/sections/${editingSection}`,
-        { content: sectionContent }
-      );
-      setEditingSection(null);
-      fetchProject();
-    } catch (error) {
-      console.error('Error saving section:', error);
+      const response = await chatAPI.getMessages(id, currentStack.id);
+      setMessages(response.data.messages || []);
+    } catch (err) {
+      setError(err.message);
     }
   };
 
-  const handleSectionCancel = () => {
-    setEditingSection(null);
-    setSectionContent('');
+  const fetchInsights = async () => {
+    if (!currentStack) return;
+    try {
+      const response = await insightAPI.getByStack(currentStack.id, {
+        tagIds: selectedTagIds,
+        search: searchQuery
+      });
+      setInsights(response.data.insights || []);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
-  const fetchCollaborators = async () => {
+  useEffect(() => {
+    if (currentStack) {
+      fetchInsights();
+    }
+  }, [selectedTagIds, searchQuery]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!messageInput.trim()) return;
+
     try {
-      const response = await axios.get(process.env.REACT_APP_API_URL + `/projects/${id}/collaborators`);
-      setCollaborators(response.data);
-    } catch (error) {
-      console.error('Error fetching collaborators:', error);
+      const response = await chatAPI.sendMessage(id, messageInput, currentStack?.id);
+      setMessageInput('');
+
+      // Check if it was a command that created a stack or insight
+      if (response.data.type === 'stack_created') {
+        // Refresh stacks and switch to the new one
+        const stacksRes = await stackAPI.getByProject(id);
+        setStacks(stacksRes.data.stacks || []);
+        setCurrentStack(response.data.data);
+      } else if (response.data.type === 'insight_created') {
+        // Refresh insights
+        fetchInsights();
+      }
+
+      // Refresh messages
+      fetchMessages();
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   const handleAddCollaborator = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(process.env.REACT_APP_API_URL + `/projects/${id}/collaborators`, newCollaborator);
-      setNewCollaborator({ email: '', role: 'collaborator' });
-      fetchCollaborators();
-    } catch (error) {
-      console.error('Error adding collaborator:', error);
+      await projectAPI.addCollaborator(id, collaboratorEmail);
+      setShowCollaboratorModal(false);
+      setCollaboratorEmail('');
+      fetchProjectData();
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   const handleRemoveCollaborator = async (collaboratorId) => {
-    try {
-      await axios.delete(process.env.REACT_APP_API_URL + `/projects/${id}/collaborators/${collaboratorId}`);
-      fetchCollaborators();
-    } catch (error) {
-      console.error('Error removing collaborator:', error);
+    if (window.confirm('Remove this collaborator?')) {
+      try {
+        await projectAPI.removeCollaborator(id, collaboratorId);
+        fetchProjectData();
+      } catch (err) {
+        setError(err.message);
+      }
     }
   };
 
-  const sections = [
-    { id: 'research', title: 'Research', icon: '🔍' },
-    { id: 'inspiration', title: 'Inspiration', icon: '💡' },
-    { id: 'sketches', title: 'Sketches', icon: '✏️' },
-    { id: 'technologies', title: 'Technologies', icon: '⚙️' }
-  ];
+  const handleDeleteInsight = async (insightId) => {
+    if (window.confirm('Delete this insight?')) {
+      try {
+        await insightAPI.delete(insightId);
+        fetchInsights();
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const handleCreateTag = async (e) => {
+    e.preventDefault();
+    try {
+      await tagAPI.create(id, newTag);
+      setNewTag({ name: '', color1: '#007AFF', color2: null });
+      setShowTagModal(false);
+      const tagsRes = await tagAPI.getByProject(id);
+      setTags(tagsRes.data.tags || []);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleAddTagToInsight = async (tagId) => {
+    try {
+      await tagAPI.addToInsight(selectedInsight.id, tagId);
+      setShowAddTagModal(false);
+      setSelectedInsight(null);
+      fetchInsights();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleRemoveTagFromInsight = async (insightId, tagId) => {
+    try {
+      await tagAPI.removeFromInsight(insightId, tagId);
+      fetchInsights();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const toggleTagFilter = (tagId) => {
+    setSelectedTagIds(prev =>
+      prev.includes(tagId)
+        ? prev.filter(id => id !== tagId)
+        : [...prev, tagId]
+    );
+  };
 
   if (loading) {
     return <div className="loading">Loading project...</div>;
@@ -112,204 +240,399 @@ const ProjectDetail = () => {
     return <div className="error">Project not found</div>;
   }
 
-  if (!user) {
-    return <div className="loading">Loading user data...</div>;
-  }
-
-  const currentSection = project.sections.find(s => s.section_type === activeSection);
-
   return (
     <div className="project-detail">
-      <header className="project-header">
-        <button onClick={() => navigate('/dashboard')} className="back-btn">
+      <div className="project-header">
+        <button onClick={() => navigate('/dashboard')} className="btn-back">
           ← Back to Projects
         </button>
         <div className="project-info">
           <h1>{project.name}</h1>
-          {project.client && <p className="client">Client: {project.client}</p>}
-          {project.deadline && <p className="deadline">Deadline: {new Date(project.deadline).toLocaleDateString()}</p>}
-          <button 
-            onClick={() => setShowCollaborators(!showCollaborators)}
-            className="collaborators-btn"
-          >
-            {showCollaborators ? 'Hide' : 'Show'} Collaborators
-          </button>
+          {/*{project.client && <p>Client: {project.client}</p>}
+          {project.deadline && <p>Deadline: {new Date(project.deadline).toLocaleDateString()}</p>}*/}
         </div>
-      </header>
+        <button onClick={() => setShowCollaboratorModal(true)} className="btn-secondary">
+          Manage Collaborators
+        </button>
+      </div>
 
-      {showCollaborators && (
-        <div className="collaborators-section">
-          <div className="collaborators-header">
-            <h3>Collaborators</h3>
-            {project.owner_id === user?.id && (
-              <button 
-                onClick={() => document.getElementById('add-collaborator-form').style.display = 'block'}
-                className="add-collaborator-btn"
-              >
-                + Add Collaborator
-              </button>
+      {error && <div className="error">{error}</div>}
+
+      <div className="project-content">
+        {/* Left side: Chat */}
+        <div className="chat-section">
+          <div className="stack-tabs">
+            {stacks.length === 0 ? (
+              <div className="empty-stack">
+                <p>No research stacks yet. Use <code>/stack [topic]</code> in chat to create one!</p>
+              </div>
+            ) : (
+              stacks.map((stack) => (
+                <button
+                  key={stack.id}
+                  className={`stack-tab ${currentStack?.id === stack.id ? 'active' : ''}`}
+                  onClick={() => setCurrentStack(stack)}
+                >
+                  {stack.topic}
+                </button>
+              ))
             )}
           </div>
 
-          {project.owner_id === user?.id && (
-            <form 
-              id="add-collaborator-form" 
-              onSubmit={handleAddCollaborator} 
-              className="add-collaborator-form"
-              style={{ display: 'none' }}
-            >
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="email">Email:</label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={newCollaborator.email}
-                    onChange={(e) => setNewCollaborator({...newCollaborator, email: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="role">Role:</label>
-                  <select
-                    id="role"
-                    name="role"
-                    value={newCollaborator.role}
-                    onChange={(e) => setNewCollaborator({...newCollaborator, role: e.target.value})}
-                  >
-                    <option value="collaborator">Collaborator</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                </div>
+          <div className="chat-messages">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`message ${msg.message_type === 'system' ? 'system' : 'user'}`}
+              >
+                {msg.message_type !== 'system' && (
+                  <span className="message-author">
+                    {msg.username || 'Unknown'}:
+                  </span>
+                )}
+                <span className="message-text">{msg.message}</span>
+                <span className="message-time">
+                  {new Date(msg.created_at).toLocaleTimeString()}
+                </span>
               </div>
-              <div className="form-actions">
-                <button type="submit">Add</button>
-                <button type="button" onClick={() => {
-                  document.getElementById('add-collaborator-form').style.display = 'none';
-                  setNewCollaborator({ email: '', role: 'collaborator' });
-                }}>
-                  Cancel
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form onSubmit={handleSendMessage} className="chat-input-form">
+            <input
+              type="text"
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              placeholder={
+                currentStack
+                  ? 'Type a message or use /insight [text] to add insight...'
+                  : 'Use /stack [topic] to create a research stack...'
+              }
+              className="chat-input"
+            />
+            <button type="submit" className="btn-primary">
+              Send
+            </button>
+          </form>
+
+          <div className="command-help">
+            <strong>Commands:</strong>
+            <code>/stack [topic]</code> - Create new research stack
+            {currentStack && (
+              <>
+                {' | '}
+                <code>/insight [text]</code> - Add insight to current stack
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right side: Insights Table */}
+        <div className="insights-section">
+          <div className="insights-header">
+            <h2>Insights {currentStack && `for "${currentStack.topic}"`}</h2>
+            <button onClick={() => setShowTagModal(true)} className="btn-secondary">
+              Manage Tags
+            </button>
+          </div>
+
+          {currentStack && (
+            <div className="insights-filters">
+              <input
+                type="text"
+                placeholder="Search insights..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="search-input"
+              />
+              <div className="tag-filters">
+                <strong>Filter by tags:</strong>
+                {tags.length === 0 ? (
+                  <span className="no-tags">No tags yet</span>
+                ) : (
+                  tags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      className={`tag-filter ${selectedTagIds.includes(tag.id) ? 'active' : ''}`}
+                      onClick={() => toggleTagFilter(tag.id)}
+                    >
+                      <ColorSquare color1={tag.color1} color2={tag.color2} size={14} />
+                      <span>{tag.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {!currentStack ? (
+            <div className="empty-state">
+              <p>Select or create a research stack to view insights</p>
+            </div>
+          ) : insights.length === 0 ? (
+            <div className="empty-state">
+              <p>No insights yet. Use <code>/insight [text]</code> to add one!</p>
+            </div>
+          ) : (
+            <div className="insights-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Insight</th>
+                    <th>Tags</th>
+                    <th>Added By</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {insights.map((insight) => (
+                    <tr key={insight.id}>
+                      <td>{insight.content}</td>
+                      <td>
+                        <div className="insight-tags">
+                          {insight.tags?.map((tag) => (
+                            <span key={tag.id} className="tag-badge">
+                              <ColorSquare color1={tag.color1} color2={tag.color2} size={12} />
+                              <span className="tag-name">{tag.name}</span>
+                              <button
+                                className="tag-remove"
+                                onClick={() => handleRemoveTagFromInsight(insight.id, tag.id)}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                          <button
+                            className="add-tag-btn"
+                            onClick={() => {
+                              setSelectedInsight(insight);
+                              setShowAddTagModal(true);
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+                      <td>{insight.username}</td>
+                      <td>
+                        <button
+                          onClick={() => handleDeleteInsight(insight.id)}
+                          className="btn-danger-small"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Collaborator Modal */}
+      {showCollaboratorModal && (
+        <div className="modal-overlay" onClick={() => setShowCollaboratorModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Manage Collaborators</h2>
+
+            <div className="collaborators-list">
+              <h3>Current Collaborators</h3>
+              {project.collaborators?.length === 0 ? (
+                <p>No collaborators yet</p>
+              ) : (
+                <ul>
+                  {project.collaborators?.map((collab) => (
+                    <li key={collab.id}>
+                      {collab.first_name} {collab.last_name} ({collab.email})
+                      <button
+                        onClick={() => handleRemoveCollaborator(collab.id)}
+                        className="btn-danger-small"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <form onSubmit={handleAddCollaborator}>
+              <h3>Add Collaborator</h3>
+              <div className="form-group">
+                <label htmlFor="email">Email Address</label>
+                <input
+                  type="email"
+                  id="email"
+                  value={collaboratorEmail}
+                  onChange={(e) => setCollaboratorEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  onClick={() => setShowCollaboratorModal(false)}
+                  className="btn-secondary"
+                >
+                  Close
+                </button>
+                <button type="submit" className="btn-primary">
+                  Add Collaborator
                 </button>
               </div>
             </form>
-          )}
-
-          <div className="collaborators-list">
-            {collaborators.length === 0 ? (
-              <p>No collaborators yet.</p>
-            ) : (
-              collaborators.map(collaborator => (
-                <div key={collaborator.id || `owner-${collaborator.user_id}`} className="collaborator-item">
-                  <div className="collaborator-info">
-                    <strong>{collaborator.first_name} {collaborator.last_name}</strong>
-                    <span className="collaborator-email">{collaborator.email}</span>
-                    <span className={`collaborator-role ${collaborator.role === 'owner' ? 'owner' : ''}`}>
-                      {collaborator.role}
-                    </span>
-                    {collaborator.role === 'owner' ? (
-                      <span className="collaborator-owner-badge">Project Creator</span>
-                    ) : collaborator.invited_by ? (
-                      <span className="collaborator-invited-by">
-                        Invited by {collaborator.invited_by_first_name} {collaborator.invited_by_last_name}
-                      </span>
-                    ) : null}
-                  </div>
-                  {collaborator.role !== 'owner' && (project.owner_id === user?.id || collaborator.user_id === user?.id) && (
-                    <button 
-                      onClick={() => handleRemoveCollaborator(collaborator.id)}
-                      className="remove-collaborator-btn"
-                      title={collaborator.user_id === user?.id ? 'Leave project' : 'Remove collaborator'}
-                    >
-                      {collaborator.user_id === user?.id ? 'Leave' : 'Remove'}
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
           </div>
         </div>
       )}
 
-      <div className="project-content">
-        <nav className="section-nav">
-          {sections.map(section => (
-            <button
-              key={section.id}
-              className={`section-tab ${activeSection === section.id ? 'active' : ''}`}
-              onClick={() => setActiveSection(section.id)}
-            >
-              <span className="section-icon">{section.icon}</span>
-              {section.title}
-            </button>
-          ))}
-        </nav>
+      {/* Tag Management Modal */}
+      {showTagModal && (
+        <div className="modal-overlay" onClick={() => setShowTagModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Manage Tags</h2>
 
-        <main className="section-content">
-          <div className="section-header">
-            <h2>{sections.find(s => s.id === activeSection)?.title}</h2>
-            {editingSection === activeSection ? (
-              <div className="section-actions">
-                <button onClick={handleSectionSave} className="save-btn">
-                  Save
-                </button>
-                <button onClick={handleSectionCancel} className="cancel-btn">
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => handleSectionEdit(activeSection)}
-                className="edit-btn"
-              >
-                Edit
-              </button>
-            )}
-          </div>
-
-          {activeSection === 'research' ? (
-            <ResearchFindings projectId={id} user={user} />
-          ) : activeSection === 'inspiration' ? (
-            <Inspiration projectId={id} user={user} />
-          ) : activeSection === 'sketches' ? (
-            <Sketches projectId={id} user={user} />
-          ) : activeSection === 'technologies' ? (
-            <Technologies projectId={id} user={user} />
-          ) : editingSection === activeSection ? (
-            <div className="section-editor">
-              <ReactQuill
-                theme="snow"
-                value={sectionContent}
-                onChange={setSectionContent}
-                placeholder={`Add ${activeSection} content here...`}
-              />
-            </div>
-          ) : (
-            <div className="section-view">
-              {currentSection?.content ? (
-                <div>
-                  <div 
-                    className="content-display"
-                    dangerouslySetInnerHTML={{ __html: currentSection.content }}
-                  />
-                  {currentSection.last_updated_by && (
-                    <div className="content-attribution">
-                      Last updated by {currentSection.updated_by_first_name} {currentSection.updated_by_last_name} (@{currentSection.updated_by_username})
-                    </div>
-                  )}
-                </div>
+            <div className="tags-list">
+              <h3>Project Tags</h3>
+              {tags.length === 0 ? (
+                <p>No tags yet</p>
               ) : (
-                <div className="empty-section">
-                  <p>No content in this section yet.</p>
-                  <button onClick={() => handleSectionEdit(activeSection)}>
-                    Add Content
-                  </button>
+                <div className="tag-grid">
+                  {tags.map((tag) => (
+                    <div key={tag.id} className="tag-item">
+                      <span className="tag-badge">
+                        <ColorSquare color1={tag.color1} color2={tag.color2} size={14} />
+                        <span className="tag-name">{tag.name}</span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          )}
-        </main>
-      </div>
+
+            <form onSubmit={handleCreateTag}>
+              <h3>Create New Tag</h3>
+              <div className="form-group">
+                <label htmlFor="tagName">Tag Name</label>
+                <input
+                  type="text"
+                  id="tagName"
+                  value={newTag.name}
+                  onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Primary Color</label>
+                <div className="color-palette">
+                  {COLOR_PALETTE.map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      className={`palette-color ${newTag.color1 === color.value ? 'selected' : ''}`}
+                      style={{ backgroundColor: color.value }}
+                      onClick={() => setNewTag({ ...newTag, color1: color.value })}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Secondary Color (optional)</label>
+                <div className="color-palette">
+                  <button
+                    type="button"
+                    className={`palette-color ${!newTag.color2 ? 'selected' : ''}`}
+                    style={{ backgroundColor: '#fff', border: '2px solid #000' }}
+                    onClick={() => setNewTag({ ...newTag, color2: null })}
+                    title="None"
+                  >
+                    ×
+                  </button>
+                  {COLOR_PALETTE.map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      className={`palette-color ${newTag.color2 === color.value ? 'selected' : ''}`}
+                      style={{ backgroundColor: color.value }}
+                      onClick={() => setNewTag({ ...newTag, color2: color.value })}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Preview</label>
+                <div className="tag-preview">
+                  <ColorSquare color1={newTag.color1} color2={newTag.color2} size={20} />
+                  <span>{newTag.name || 'Tag Name'}</span>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  onClick={() => setShowTagModal(false)}
+                  className="btn-secondary"
+                >
+                  Close
+                </button>
+                <button type="submit" className="btn-primary">
+                  Create Tag
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Tag to Insight Modal */}
+      {showAddTagModal && selectedInsight && (
+        <div className="modal-overlay" onClick={() => setShowAddTagModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Add Tag to Insight</h2>
+            <p className="modal-subtitle">{selectedInsight.content.substring(0, 100)}...</p>
+
+            {tags.length === 0 ? (
+              <div className="empty-state">
+                <p>No tags available. Create tags first!</p>
+              </div>
+            ) : (
+              <div className="tag-selection">
+                {tags
+                  .filter(tag => !selectedInsight.tags?.some(t => t.id === tag.id))
+                  .map((tag) => (
+                    <button
+                      key={tag.id}
+                      className="tag-badge selectable"
+                      onClick={() => handleAddTagToInsight(tag.id)}
+                    >
+                      <ColorSquare color1={tag.color1} color2={tag.color2} size={14} />
+                      <span className="tag-name">{tag.name}</span>
+                    </button>
+                  ))}
+                {tags.every(tag => selectedInsight.tags?.some(t => t.id === tag.id)) && (
+                  <p>All tags have been added to this insight</p>
+                )}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddTagModal(false);
+                  setSelectedInsight(null);
+                }}
+                className="btn-secondary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

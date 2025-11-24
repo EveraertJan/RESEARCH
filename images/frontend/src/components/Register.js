@@ -51,6 +51,7 @@ const Register = () => {
             name="email"
             value={formData.email}
             onChange={handleChange}
+            className="form-control"
             required
           />
         </div>
@@ -63,6 +64,7 @@ const Register = () => {
             name="first_name"
             value={formData.first_name}
             onChange={handleChange}
+            className="form-control"
             required
           />
         </div>
@@ -75,6 +77,7 @@ const Register = () => {
             name="last_name"
             value={formData.last_name}
             onChange={handleChange}
+            className="form-control"
             required
           />
         </div>
@@ -87,6 +90,7 @@ const Register = () => {
             name="username"
             value={formData.username}
             onChange={handleChange}
+            className="form-control"
             required
           />
         </div>
@@ -99,11 +103,12 @@ const Register = () => {
             name="password"
             value={formData.password}
             onChange={handleChange}
+            className="form-control"
             required
           />
         </div>
 
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={loading} className="btn btn-primary">
           {loading ? 'Registering...' : 'Register'}
         </button>
       </form>

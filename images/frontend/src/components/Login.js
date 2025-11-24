@@ -48,6 +48,7 @@ const Login = () => {
             name="email"
             value={formData.email}
             onChange={handleChange}
+            className="form-control"
             required
           />
         </div>
@@ -60,11 +61,12 @@ const Login = () => {
             name="password"
             value={formData.password}
             onChange={handleChange}
+            className="form-control"
             required
           />
         </div>
 
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={loading} className="btn btn-primary">
           {loading ? 'Logging in...' : 'Login'}
         </button>
       </form>

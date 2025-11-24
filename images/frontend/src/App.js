@@ -6,6 +6,7 @@ import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import ProjectDetail from './components/ProjectDetail';
 import Settings from './components/Settings';
+import Footer from './components/Footer';
 import './index.css';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
               <Route path="/" element={<Login />} />
             </Routes>
           </div>
+          <Footer />
         </div>
       </Router>
     </AuthProvider>
