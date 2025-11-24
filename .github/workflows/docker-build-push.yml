@@ -69,7 +69,7 @@ jobs:
 
 
       - name: Extract metadata for Static
-        id: meta-frontend
+        id: meta-static
         uses: docker/metadata-action@v5
         with:
           images: tastbaar/research-static
