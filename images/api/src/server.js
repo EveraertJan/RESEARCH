@@ -10,6 +10,7 @@ const stack_routes = require('./routes/stacks');
 const insight_routes = require('./routes/insights');
 const chat_routes = require('./routes/chat');
 const tag_routes = require('./routes/tags');
+const image_routes = require('./routes/images');
 
 const app = express();
 const server = createServer(app);
@@ -34,6 +35,7 @@ app.use('/stacks', stack_routes);
 app.use('/insights', insight_routes);
 app.use('/chat', chat_routes);
 app.use('/tags', tag_routes);
+app.use('/images', image_routes);
 
 app.use(errorHandler);
 

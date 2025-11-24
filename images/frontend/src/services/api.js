@@ -90,6 +90,30 @@ export const tagAPI = {
   removeFromInsight: (insightId, tagId) => apiClient.delete(`/tags/insight/${insightId}/tag/${tagId}`)
 };
 
+export const imageAPI = {
+  getByStack: (stackId, params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.tagIds && params.tagIds.length > 0) {
+      params.tagIds.forEach(id => queryParams.append('tagIds', id));
+    }
+    const queryString = queryParams.toString();
+    return apiClient.get(`/images/stack/${stackId}${queryString ? '?' + queryString : ''}`);
+  },
+  upload: (stackId, formData) => {
+    return axios.create({
+      baseURL: API_BASE_URL,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    }).post(`/images/stack/${stackId}`, formData);
+  },
+  getFileUrl: (filename) => `${API_BASE_URL}/uploads/images/${filename}`,
+  delete: (imageId) => apiClient.delete(`/images/${imageId}`),
+  addTag: (imageId, tagId) => apiClient.post(`/images/${imageId}/tags/${tagId}`),
+  removeTag: (imageId, tagId) => apiClient.delete(`/images/${imageId}/tags/${tagId}`)
+};
+
 export const chatAPI = {
   getMessages: (projectId, stackId = null) => {
     const url = stackId

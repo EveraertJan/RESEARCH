@@ -25,3 +25,10 @@ Let's make a website that allows the user to keep track of reserach linked to a 
 [x] As a user, I can add tags to insights
 [x] As a user, I can filter insights based on tags
 [x] As a user, I can search for insights using keywords
+
+[x] As a user, I want to be able to add images to a research stack, using the
+  command `/image [name of the image]`. When I use this command, I get a popup to
+  upload a file and (optional) assign a tag to the image. The image can be be
+  found in a separate table, using tabs (insights, images) in the right hand
+  
+[ ] Change the input to scale with multiline (text-wrap)

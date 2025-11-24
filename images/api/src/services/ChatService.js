@@ -17,6 +17,7 @@ class ChatService {
   parseSlashCommand(message) {
     const stackPattern = /^\/stack\s+(.+)$/i;
     const insightPattern = /^\/insight\s+(.+)$/i;
+    const imagePattern = /^\/image\s+(.+)$/i;
 
     const stackMatch = message.match(stackPattern);
     if (stackMatch) {
@@ -31,6 +32,14 @@ class ChatService {
       return {
         type: 'insight',
         content: insightMatch[1].trim()
+      };
+    }
+
+    const imageMatch = message.match(imagePattern);
+    if (imageMatch) {
+      return {
+        type: 'image',
+        content: imageMatch[1].trim()
       };
     }
 
@@ -108,6 +117,20 @@ class ChatService {
         return {
           type: 'insight_created',
           data: insight
+        };
+
+      case 'image':
+        if (!stackId) {
+          throw new AppError('You must be in a stack chat to add images', 400);
+        }
+
+        // Return instruction to show upload modal
+        return {
+          type: 'image_upload_requested',
+          data: {
+            stackId: stackId,
+            name: command.content
+          }
         };
 
       default:
