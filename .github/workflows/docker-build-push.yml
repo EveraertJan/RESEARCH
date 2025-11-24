@@ -29,7 +29,7 @@ jobs:
         id: meta-api
         uses: docker/metadata-action@v5
         with:
-          images: tastbaar/checkpoint-api
+          images: tastbaar/research-api
           tags: |
             type=raw,value=latest
             type=sha,prefix={{branch}}-
@@ -42,45 +42,26 @@ jobs:
           push: true
           tags: ${{ steps.meta-api.outputs.tags }}
           labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=registry,ref=tastbaar/checkpoint-api:latest
+          cache-from: type=registry,ref=tastbaar/research-api:latest
           cache-to: type=inline
 
-      - name: Extract metadata for Student
-        id: meta-student
+
+      - name: Extract metadata for Frontend
+        id: meta-frontend
         uses: docker/metadata-action@v5
         with:
-          images: tastbaar/checkpoint-student
+          images: tastbaar/research-frontend
           tags: |
             type=raw,value=latest
             type=sha,prefix={{branch}}-
 
-      - name: Build and push Student image
+      - name: Build and push Frontend image
         uses: docker/build-push-action@v5
         with:
-          context: ./images/student
-          file: ./images/student/Dockerfile
+          context: ./images/frontend
+          file: ./images/frontend/Dockerfile
           push: true
-          tags: ${{ steps.meta-student.outputs.tags }}
-          labels: ${{ steps.meta-student.outputs.labels }}
-          cache-from: type=registry,ref=tastbaar/checkpoint-student:latest
-          cache-to: type=inline
-
-      - name: Extract metadata for Teacher
-        id: meta-teacher
-        uses: docker/metadata-action@v5
-        with:
-          images: tastbaar/checkpoint-teacher
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix={{branch}}-
-
-      - name: Build and push Teacher image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./images/teacher
-          file: ./images/teacher/Dockerfile
-          push: true
-          tags: ${{ steps.meta-teacher.outputs.tags }}
-          labels: ${{ steps.meta-teacher.outputs.labels }}
-          cache-from: type=registry,ref=tastbaar/checkpoint-teacher:latest
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=registry,ref=tastbaar/research-frontend:latest
           cache-to: type=inline
