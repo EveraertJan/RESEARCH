@@ -12,8 +12,9 @@ RUN npm i
 # Copy source code
 COPY . .
 
-# Set API URL to use nginx proxy
-ENV REACT_APP_API_URL=/api
+# Set API URL to production domain
+ARG DOMAIN=tastbaar.studio
+ENV REACT_APP_API_URL=https://api.${DOMAIN}
 
 # Build the app
 RUN npm run build
