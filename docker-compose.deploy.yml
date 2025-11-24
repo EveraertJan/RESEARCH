@@ -35,8 +35,6 @@ services:
     networks:
       - backend
     restart: unless-stopped
-    ports:
-      - 3001:3001
     labels:
       - "traefik.enable=true"
       # HTTP router (for initial setup and ACME challenge)
@@ -44,10 +42,10 @@ services:
       - "traefik.http.routers.frontend-http.entrypoints=web"
       - "traefik.http.routers.frontend-http.service=frontend"
       # HTTPS router
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.rule=Host(`research.${DOMAIN}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend.loadbalancer.server.port=3001"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
 
@@ -100,8 +98,6 @@ services:
     networks:
       - backend
     restart: unless-stopped
-    ports:
-      - 3000:3000
     labels:
       - "traefik.enable=true"
       # HTTP router (for initial setup and ACME challenge)
