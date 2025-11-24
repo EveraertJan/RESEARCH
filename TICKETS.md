@@ -30,5 +30,7 @@ Let's make a website that allows the user to keep track of reserach linked to a 
   command `/image [name of the image]`. When I use this command, I get a popup to
   upload a file and (optional) assign a tag to the image. The image can be be
   found in a separate table, using tabs (insights, images) in the right hand
-  
-[ ] Change the input to scale with multiline (text-wrap)
+[x] As a user, f I click on an image, I see an overlay with the enlarged image, I
+  can go to the next or previous image
+
+[x] Change the input to scale with multiline (text-wrap)

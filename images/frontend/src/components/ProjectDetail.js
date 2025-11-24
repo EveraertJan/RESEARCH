@@ -42,6 +42,7 @@ const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const [project, setProject] = useState(null);
   const [stacks, setStacks] = useState([]);
@@ -86,6 +87,26 @@ const ProjectDetail = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const autoResizeTextarea = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+    }
+  };
+
+  const handleTextareaChange = (e) => {
+    setMessageInput(e.target.value);
+    autoResizeTextarea();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e);
+    }
   };
 
   const fetchProjectData = async () => {
@@ -159,6 +180,11 @@ const ProjectDetail = () => {
     try {
       const response = await chatAPI.sendMessage(id, messageInput, currentStack?.id);
       setMessageInput('');
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
 
       // Check if it was a command that created a stack, insight, or image upload request
       if (response.data.type === 'stack_created') {
@@ -434,16 +460,18 @@ const ProjectDetail = () => {
           </div>
 
           <form onSubmit={handleSendMessage} className="chat-input-form">
-            <input
-              type="text"
+            <textarea
+              ref={textareaRef}
               value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
+              onChange={handleTextareaChange}
+              onKeyDown={handleKeyDown}
               placeholder={
                 currentStack
-                  ? 'Type a message or use /insight [text] to add insight...'
-                  : 'Use /stack [topic] to create a research stack...'
+                  ? 'Type a message or use /insight [text] to add insight... (Shift+Enter to send)'
+                  : 'Use /stack [topic] to create a research stack... (Shift+Enter to send)'
               }
               className="chat-input"
+              rows="1"
             />
             <button type="submit" className="btn-primary">
               Send

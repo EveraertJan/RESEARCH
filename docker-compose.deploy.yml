@@ -1,0 +1,150 @@
+services:
+  # Traefik reverse proxy for HTTPS
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Redirect HTTP to HTTPS (uncomment after SSL is working)
+      # - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      # - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./_volumes/letsencrypt:/letsencrypt
+    networks:
+      - backend
+    restart: unless-stopped
+
+  frontend:
+    image: tastbaar/research-frontend:latest
+    container_name: frontend
+    depends_on:
+      - api
+    networks:
+      - backend
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      # HTTP router (for initial setup and ACME challenge)
+      - "traefik.http.routers.frontend-http.rule=Host(`research.${DOMAIN}`)"
+      - "traefik.http.routers.frontend-http.entrypoints=web"
+      - "traefik.http.routers.frontend-http.service=student"
+      # HTTPS router
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
+
+
+
+  static:
+    image: tastbaar/research-static:latest
+    container_name: static
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      # HTTP router (for initial setup and ACME challenge)
+      - "traefik.http.routers.static-http.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.static-http.entrypoints=web"
+      - "traefik.http.routers.static-http.service=student"
+      # HTTPS router
+      - "traefik.http.routers.static.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.static.entrypoints=websecure"
+      - "traefik.http.routers.static.tls.certresolver=letsencrypt"
+      - "traefik.http.services.static.loadbalancer.server.port=80"
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
+
+  # API Backend
+  api:    
+    image: tastbaar/research-api:latest
+    container_name: api
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: db
+      TOKEN_ENCRYPTION: ${TOKEN_ENCRYPTION}
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: production
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    volumes:
+      - ./_volumes/uploads:/usr/app/uploads
+    command: npm run prod
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      # HTTP router (for initial setup and ACME challenge)
+      - "traefik.http.routers.api-http.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.api-http.entrypoints=web"
+      - "traefik.http.routers.api-http.service=api"
+      # HTTPS router
+      - "traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+      # Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # PostgreSQL Database
+  db:
+    image: "postgres:17-alpine"
+    container_name: db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./_volumes/postgres:/var/lib/postgresql/data
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DATABASE} -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: checkpoint-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+    restart: unless-stopped
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge

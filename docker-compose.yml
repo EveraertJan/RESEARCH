@@ -58,6 +58,14 @@ services:
       - backend
 
 
+  static:
+
+    build: ./images/static
+    container_name: "${PROJECT_NAME}-static"
+    ports:
+      - 8080:80
+    volumes:
+      -  ./images/static/src/:/usr/share/nginx/html/
 
 networks:
   backend:

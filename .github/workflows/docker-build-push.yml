@@ -65,3 +65,25 @@ jobs:
           labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=registry,ref=tastbaar/research-frontend:latest
           cache-to: type=inline
+
+
+
+      - name: Extract metadata for Static
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: tastbaar/research-static
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push Static image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./images/static
+          file: ./images/static/Dockerfile
+          push: true
+          tags: ${{ steps.meta-static.outputs.tags }}
+          labels: ${{ steps.meta-static.outputs.labels }}
+          cache-from: type=registry,ref=tastbaar/research-static:latest
+          cache-to: type=inline
