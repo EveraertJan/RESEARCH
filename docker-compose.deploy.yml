@@ -36,7 +36,7 @@ services:
       - backend
     restart: unless-stopped
     ports:
-      - 8081:80
+      - 3001:3001
     labels:
       - "traefik.enable=true"
       # HTTP router (for initial setup and ACME challenge)
@@ -47,7 +47,7 @@ services:
       - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3001"
       # Watchtower
       - "com.centurylinklabs.watchtower.enable=true"
 
@@ -58,8 +58,8 @@ services:
     image: tastbaar/research-static:latest
     container_name: static
     restart: unless-stopped
-    ports:
-      - 8080:80
+    networks:
+      - backend
     labels:
       - "traefik.enable=true"
       # HTTP router (for initial setup and ACME challenge)
