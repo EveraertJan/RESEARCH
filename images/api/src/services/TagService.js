@@ -47,6 +47,37 @@ class TagService {
     return tags;
   }
 
+  async updateTag(tagId, userId, updates) {
+    const tag = await this.tagRepository.findById(tagId);
+    if (!tag) {
+      throw new AppError('Tag not found', 404);
+    }
+
+    const hasAccess = await this.projectRepository.hasAccess(tag.project_id, userId);
+    if (!hasAccess) {
+      throw new AppError('You do not have access to this project', 403);
+    }
+
+    const updateData = {};
+    if (updates.name !== undefined && updates.name.trim()) {
+      // Check if new name already exists in project
+      const existing = await this.tagRepository.findByName(tag.project_id, updates.name.trim());
+      if (existing && existing.id !== tagId) {
+        throw new AppError('A tag with this name already exists in this project', 409);
+      }
+      updateData.name = updates.name.trim();
+    }
+    if (updates.color1 !== undefined) {
+      updateData.color1 = updates.color1;
+    }
+    if (updates.color2 !== undefined) {
+      updateData.color2 = updates.color2;
+    }
+
+    const updated = await this.tagRepository.update(tagId, updateData);
+    return updated;
+  }
+
   async deleteTag(tagId, userId) {
     const tag = await this.tagRepository.findById(tagId);
     if (!tag) {

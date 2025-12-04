@@ -34,12 +34,17 @@ class InsightRepository extends BaseRepository {
       )
       .orderBy('insights.created_at', 'asc');
 
-    // Get tags for each insight
+    // Get tags and documents for each insight
     for (let insight of insights) {
       insight.tags = await this.db('tags')
         .join('insight_tags', 'tags.id', 'insight_tags.tag_id')
         .where('insight_tags.insight_id', insight.id)
         .select('tags.*');
+
+      insight.documents = await this.db('documents')
+        .join('insight_documents', 'documents.id', 'insight_documents.document_id')
+        .where('insight_documents.insight_id', insight.id)
+        .select('documents.*');
     }
 
     return insights;
@@ -56,6 +61,36 @@ class InsightRepository extends BaseRepository {
     return result;
   }
 
+  async addDocumentToInsight(insightId, documentId) {
+    const [result] = await this.db('insight_documents')
+      .insert({
+        insight_id: insightId,
+        document_id: documentId
+      })
+      .returning('*');
+    return result;
+  }
+
+  async removeDocumentFromInsight(insightId, documentId) {
+    return await this.db('insight_documents')
+      .where({ insight_id: insightId, document_id: documentId })
+      .del();
+  }
+
+  async hasDocument(insightId, documentId) {
+    const result = await this.db('insight_documents')
+      .where({ insight_id: insightId, document_id: documentId })
+      .first();
+    return !!result;
+  }
+
+  async getDocumentsForInsight(insightId) {
+    return await this.db('documents')
+      .join('insight_documents', 'documents.id', 'insight_documents.document_id')
+      .where('insight_documents.insight_id', insightId)
+      .select('documents.*');
+  }
+
   async searchInsights(stackId, searchQuery) {
     const insights = await this.db(this.tableName)
       .join('users', 'insights.created_by', 'users.id')
@@ -69,12 +104,17 @@ class InsightRepository extends BaseRepository {
       )
       .orderBy('insights.created_at', 'asc');
 
-    // Get tags for each insight
+    // Get tags and documents for each insight
     for (let insight of insights) {
       insight.tags = await this.db('tags')
         .join('insight_tags', 'tags.id', 'insight_tags.tag_id')
         .where('insight_tags.insight_id', insight.id)
         .select('tags.*');
+
+      insight.documents = await this.db('documents')
+        .join('insight_documents', 'documents.id', 'insight_documents.document_id')
+        .where('insight_documents.insight_id', insight.id)
+        .select('documents.*');
     }
 
     return insights;

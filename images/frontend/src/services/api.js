@@ -79,12 +79,17 @@ export const insightAPI = {
     return apiClient.get(`/insights/stack/${stackId}${queryString ? '?' + queryString : ''}`);
   },
   search: (stackId, query) => apiClient.get(`/insights/stack/${stackId}/search?q=${encodeURIComponent(query)}`),
-  delete: (insightId) => apiClient.delete(`/insights/${insightId}`)
+  update: (insightId, content) => apiClient.put(`/insights/${insightId}`, { content }),
+  delete: (insightId) => apiClient.delete(`/insights/${insightId}`),
+  linkDocument: (insightId, documentId) => apiClient.post(`/insights/${insightId}/documents/${documentId}`),
+  unlinkDocument: (insightId, documentId) => apiClient.delete(`/insights/${insightId}/documents/${documentId}`),
+  getDocuments: (insightId) => apiClient.get(`/insights/${insightId}/documents`)
 };
 
 export const tagAPI = {
   getByProject: (projectId) => apiClient.get(`/tags/project/${projectId}`),
   create: (projectId, data) => apiClient.post(`/tags/project/${projectId}`, data),
+  update: (tagId, data) => apiClient.put(`/tags/${tagId}`, data),
   delete: (tagId) => apiClient.delete(`/tags/${tagId}`),
   addToInsight: (insightId, tagId) => apiClient.post(`/tags/insight/${insightId}/tag/${tagId}`),
   removeFromInsight: (insightId, tagId) => apiClient.delete(`/tags/insight/${insightId}/tag/${tagId}`)
@@ -112,6 +117,62 @@ export const imageAPI = {
   delete: (imageId) => apiClient.delete(`/images/${imageId}`),
   addTag: (imageId, tagId) => apiClient.post(`/images/${imageId}/tags/${tagId}`),
   removeTag: (imageId, tagId) => apiClient.delete(`/images/${imageId}/tags/${tagId}`)
+};
+
+export const documentAPI = {
+  getByStack: (stackId, params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.tagIds && params.tagIds.length > 0) {
+      params.tagIds.forEach(id => queryParams.append('tagIds', id));
+    }
+    const queryString = queryParams.toString();
+    return apiClient.get(`/documents/stack/${stackId}${queryString ? '?' + queryString : ''}`);
+  },
+  getByProject: (projectId, params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.tagIds && params.tagIds.length > 0) {
+      params.tagIds.forEach(id => queryParams.append('tagIds', id));
+    }
+    const queryString = queryParams.toString();
+    return apiClient.get(`/documents/project/${projectId}${queryString ? '?' + queryString : ''}`);
+  },
+  getAll: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.tagIds && params.tagIds.length > 0) {
+      params.tagIds.forEach(id => queryParams.append('tagIds', id));
+    }
+    const queryString = queryParams.toString();
+    return apiClient.get(`/documents/all${queryString ? '?' + queryString : ''}`);
+  },
+  getById: (documentId) => apiClient.get(`/documents/${documentId}`),
+  upload: (stackId, formData) => {
+    return axios.create({
+      baseURL: API_BASE_URL,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    }).post(`/documents/stack/${stackId}`, formData);
+  },
+  uploadStandalone: (formData) => {
+    return axios.create({
+      baseURL: API_BASE_URL,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    }).post(`/documents/upload`, formData);
+  },
+  getFileUrl: (filename) => `${API_BASE_URL}/uploads/documents/${filename}`,
+  update: (documentId, data) => apiClient.put(`/documents/${documentId}`, data),
+  delete: (documentId) => apiClient.delete(`/documents/${documentId}`),
+  addReference: (documentId, projectId, stackId = null) =>
+    apiClient.post(`/documents/${documentId}/references`, { projectId, stackId }),
+  removeReference: (documentId, projectId, stackId = null) =>
+    apiClient.delete(`/documents/${documentId}/references`, { data: { projectId, stackId } }),
+  getReferences: (documentId) => apiClient.get(`/documents/${documentId}/references`),
+  addTag: (documentId, tagId) => apiClient.post(`/documents/${documentId}/tags/${tagId}`),
+  removeTag: (documentId, tagId) => apiClient.delete(`/documents/${documentId}/tags/${tagId}`)
 };
 
 export const chatAPI = {

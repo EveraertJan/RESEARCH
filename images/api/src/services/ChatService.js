@@ -18,6 +18,7 @@ class ChatService {
     const stackPattern = /^\/stack\s+(.+)$/i;
     const insightPattern = /^\/insight\s+(.+)$/i;
     const imagePattern = /^\/image\s+(.+)$/i;
+    const documentPattern = /^\/document\s+(.+)$/i;
 
     const stackMatch = message.match(stackPattern);
     if (stackMatch) {
@@ -40,6 +41,14 @@ class ChatService {
       return {
         type: 'image',
         content: imageMatch[1].trim()
+      };
+    }
+
+    const documentMatch = message.match(documentPattern);
+    if (documentMatch) {
+      return {
+        type: 'document',
+        content: documentMatch[1].trim()
       };
     }
 
@@ -127,6 +136,20 @@ class ChatService {
         // Return instruction to show upload modal
         return {
           type: 'image_upload_requested',
+          data: {
+            stackId: stackId,
+            name: command.content
+          }
+        };
+
+      case 'document':
+        if (!stackId) {
+          throw new AppError('You must be in a stack chat to add documents', 400);
+        }
+
+        // Return instruction to show document upload modal
+        return {
+          type: 'document_upload_requested',
           data: {
             stackId: stackId,
             name: command.content

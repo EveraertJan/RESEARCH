@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectAPI, stackAPI, chatAPI, insightAPI, tagAPI, imageAPI } from '../services/api';
+import { projectAPI, stackAPI, chatAPI, insightAPI, tagAPI, imageAPI, documentAPI } from '../services/api';
+
+// Import components
+import ChatSection from './ProjectDetail/Chat/ChatSection';
+import InsightsTable from './ProjectDetail/Tables/InsightsTable';
+import ImagesTable from './ProjectDetail/Tables/ImagesTable';
+import DocumentsTable from './ProjectDetail/Tables/DocumentsTable';
+import TagFilters from './ProjectDetail/Shared/TagFilters';
+import AddTagModal from './ProjectDetail/Modals/AddTagModal';
+import UploadImageModal from './ProjectDetail/Modals/UploadImageModal';
+import UploadDocumentModal from './ProjectDetail/Modals/UploadDocumentModal';
+import LinkDocumentModal from './ProjectDetail/Modals/LinkDocumentModal';
+import EditInsightModal from './ProjectDetail/Modals/EditInsightModal';
+import EditDocumentModal from './ProjectDetail/Modals/EditDocumentModal';
+import ManageTagsModal from './ProjectDetail/Modals/ManageTagsModal';
+import ManageCollaboratorsModal from './ProjectDetail/Modals/ManageCollaboratorsModal';
 
 const COLOR_PALETTE = [
   { name: 'Red', value: '#FF3B30' },
@@ -12,44 +27,20 @@ const COLOR_PALETTE = [
   { name: 'Gray', value: '#8E8E93' }
 ];
 
-const ColorSquare = ({ color1, color2, size = 16 }) => {
-  if (!color2) {
-    return (
-      <span
-        className="color-square"
-        style={{
-          width: `${size}px`,
-          height: `${size}px`,
-          backgroundColor: color1
-        }}
-      />
-    );
-  }
-
-  return (
-    <span
-      className="color-square dual"
-      style={{
-        width: `${size}px`,
-        height: `${size}px`,
-        background: `linear-gradient(to top right, ${color1} 0%, ${color1} 50%, ${color2} 50%, ${color2} 100%)`
-      }}
-    />
-  );
-};
-
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
+  // State
   const [project, setProject] = useState(null);
   const [stacks, setStacks] = useState([]);
   const [currentStack, setCurrentStack] = useState(null);
   const [messages, setMessages] = useState([]);
   const [insights, setInsights] = useState([]);
   const [images, setImages] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [tags, setTags] = useState([]);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,18 +48,31 @@ const ProjectDetail = () => {
   const [activeTab, setActiveTab] = useState('insights');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Modal states
   const [showCollaboratorModal, setShowCollaboratorModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const [showAddTagModal, setShowAddTagModal] = useState(false);
   const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+  const [showDocumentUploadModal, setShowDocumentUploadModal] = useState(false);
+  const [showLinkDocumentModal, setShowLinkDocumentModal] = useState(false);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [showEditInsightModal, setShowEditInsightModal] = useState(false);
+  const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+
+  // Selected items
   const [selectedInsight, setSelectedInsight] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Form data
   const [collaboratorEmail, setCollaboratorEmail] = useState('');
   const [newTag, setNewTag] = useState({ name: '', color1: '#007AFF', color2: null });
   const [imageUploadData, setImageUploadData] = useState({ name: '', file: null, selectedTagIds: [] });
-  const [showImageViewer, setShowImageViewer] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [documentUploadData, setDocumentUploadData] = useState({ name: '', description: '', file: null, selectedTagIds: [] });
 
+  // Effects
   useEffect(() => {
     fetchProjectData();
   }, [id]);
@@ -78,6 +82,7 @@ const ProjectDetail = () => {
       fetchMessages();
       fetchInsights();
       fetchImages();
+      fetchDocuments();
     }
   }, [currentStack]);
 
@@ -85,6 +90,15 @@ const ProjectDetail = () => {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    if (currentStack) {
+      fetchInsights();
+      fetchImages();
+      fetchDocuments();
+    }
+  }, [selectedTagIds, searchQuery]);
+
+  // Helper functions
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -97,18 +111,7 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleTextareaChange = (e) => {
-    setMessageInput(e.target.value);
-    autoResizeTextarea();
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage(e);
-    }
-  };
-
+  // Fetch functions
   const fetchProjectData = async () => {
     try {
       const [projectRes, stacksRes, tagsRes] = await Promise.all([
@@ -121,12 +124,13 @@ const ProjectDetail = () => {
       setStacks(stacksRes.data.stacks || []);
       setTags(tagsRes.data.tags || []);
 
-      if (stacksRes.data.stacks?.length > 0) {
+      if (stacksRes.data.stacks && stacksRes.data.stacks.length > 0) {
         setCurrentStack(stacksRes.data.stacks[0]);
       }
+
+      setLoading(false);
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -166,12 +170,30 @@ const ProjectDetail = () => {
     }
   };
 
-  useEffect(() => {
-    if (currentStack) {
-      fetchInsights();
-      fetchImages();
+  const fetchDocuments = async () => {
+    if (!currentStack) return;
+    try {
+      const response = await documentAPI.getByStack(currentStack.id, {
+        tagIds: selectedTagIds
+      });
+      setDocuments(response.data.documents || []);
+    } catch (err) {
+      setError(err.message);
     }
-  }, [selectedTagIds, searchQuery]);
+  };
+
+  // Chat handlers
+  const handleTextareaChange = (e) => {
+    setMessageInput(e.target.value);
+    autoResizeTextarea();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e);
+    }
+  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -181,57 +203,33 @@ const ProjectDetail = () => {
       const response = await chatAPI.sendMessage(id, messageInput, currentStack?.id);
       setMessageInput('');
 
-      // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
 
-      // Check if it was a command that created a stack, insight, or image upload request
       if (response.data.type === 'stack_created') {
-        // Refresh stacks and switch to the new one
         const stacksRes = await stackAPI.getByProject(id);
         setStacks(stacksRes.data.stacks || []);
         setCurrentStack(response.data.data);
       } else if (response.data.type === 'insight_created') {
-        // Refresh insights
         fetchInsights();
       } else if (response.data.type === 'image_upload_requested') {
-        // Show image upload modal
         setImageUploadData({ name: response.data.data.name, file: null, selectedTagIds: [] });
         setShowImageUploadModal(true);
-        return; // Don't refresh messages yet
+        return;
+      } else if (response.data.type === 'document_upload_requested') {
+        setDocumentUploadData({ name: response.data.data.name, description: '', file: null, selectedTagIds: [] });
+        setShowDocumentUploadModal(true);
+        return;
       }
 
-      // Refresh messages
       fetchMessages();
     } catch (err) {
       setError(err.message);
     }
   };
 
-  const handleAddCollaborator = async (e) => {
-    e.preventDefault();
-    try {
-      await projectAPI.addCollaborator(id, collaboratorEmail);
-      setShowCollaboratorModal(false);
-      setCollaboratorEmail('');
-      fetchProjectData();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleRemoveCollaborator = async (collaboratorId) => {
-    if (window.confirm('Remove this collaborator?')) {
-      try {
-        await projectAPI.removeCollaborator(id, collaboratorId);
-        fetchProjectData();
-      } catch (err) {
-        setError(err.message);
-      }
-    }
-  };
-
+  // Insight handlers
   const handleDeleteInsight = async (insightId) => {
     if (window.confirm('Delete this insight?')) {
       try {
@@ -243,16 +241,13 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleCreateTag = async (e) => {
-    e.preventDefault();
+  const handleEditInsight = async (insightId, newContent) => {
     try {
-      await tagAPI.create(id, newTag);
-      setNewTag({ name: '', color1: '#007AFF', color2: null });
-      setShowTagModal(false);
-      const tagsRes = await tagAPI.getByProject(id);
-      setTags(tagsRes.data.tags || []);
+      await insightAPI.update(insightId, newContent);
+      fetchInsights();
     } catch (err) {
       setError(err.message);
+      throw err;
     }
   };
 
@@ -276,14 +271,27 @@ const ProjectDetail = () => {
     }
   };
 
-  const toggleTagFilter = (tagId) => {
-    setSelectedTagIds(prev =>
-      prev.includes(tagId)
-        ? prev.filter(id => id !== tagId)
-        : [...prev, tagId]
-    );
+  const handleLinkDocumentToInsight = async (documentId) => {
+    try {
+      await insightAPI.linkDocument(selectedInsight.id, documentId);
+      setShowLinkDocumentModal(false);
+      setSelectedInsight(null);
+      fetchInsights();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
+  const handleRemoveDocumentFromInsight = async (insightId, documentId) => {
+    try {
+      await insightAPI.unlinkDocument(insightId, documentId);
+      fetchInsights();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Image handlers
   const handleImageUpload = async (e) => {
     e.preventDefault();
     if (!imageUploadData.file) {
@@ -299,7 +307,6 @@ const ProjectDetail = () => {
       const response = await imageAPI.upload(currentStack.id, formData);
       const uploadedImage = response.data.data.image;
 
-      // Add tags if any were selected
       if (imageUploadData.selectedTagIds.length > 0) {
         for (const tagId of imageUploadData.selectedTagIds) {
           await imageAPI.addTag(uploadedImage.id, tagId);
@@ -347,19 +354,97 @@ const ProjectDetail = () => {
   };
 
   const toggleImageTagFilter = (tagId) => {
-    if (imageUploadData.selectedTagIds.includes(tagId)) {
-      setImageUploadData({
-        ...imageUploadData,
-        selectedTagIds: imageUploadData.selectedTagIds.filter(id => id !== tagId)
-      });
-    } else {
-      setImageUploadData({
-        ...imageUploadData,
-        selectedTagIds: [...imageUploadData.selectedTagIds, tagId]
-      });
+    setImageUploadData(prev => ({
+      ...prev,
+      selectedTagIds: prev.selectedTagIds.includes(tagId)
+        ? prev.selectedTagIds.filter(id => id !== tagId)
+        : [...prev.selectedTagIds, tagId]
+    }));
+  };
+
+  // Document handlers
+  const handleDocumentUpload = async (e) => {
+    e.preventDefault();
+    if (!documentUploadData.file) {
+      setError('Please select a file');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('document', documentUploadData.file);
+      formData.append('name', documentUploadData.name);
+      formData.append('description', documentUploadData.description);
+
+      const response = await documentAPI.upload(currentStack.id, formData);
+      const uploadedDocument = response.data.data.document;
+
+      if (documentUploadData.selectedTagIds.length > 0) {
+        for (const tagId of documentUploadData.selectedTagIds) {
+          await documentAPI.addTag(uploadedDocument.id, tagId);
+        }
+      }
+
+      setShowDocumentUploadModal(false);
+      setDocumentUploadData({ name: '', description: '', file: null, selectedTagIds: [] });
+      fetchDocuments();
+      setActiveTab('documents');
+    } catch (err) {
+      setError(err.message);
     }
   };
 
+  const handleDeleteDocument = async (documentId) => {
+    if (window.confirm('Delete this document?')) {
+      try {
+        await documentAPI.delete(documentId);
+        fetchDocuments();
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const handleEditDocument = async (documentId, updates) => {
+    try {
+      await documentAPI.update(documentId, updates);
+      fetchDocuments();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const handleAddTagToDocument = async (tagId) => {
+    try {
+      await documentAPI.addTag(selectedDocument.id, tagId);
+      setShowAddTagModal(false);
+      setSelectedDocument(null);
+      fetchDocuments();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleRemoveTagFromDocument = async (documentId, tagId) => {
+    try {
+      await documentAPI.removeTag(documentId, tagId);
+      fetchDocuments();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const toggleDocumentTagFilter = (tagId) => {
+    setDocumentUploadData(prev => ({
+      ...prev,
+      selectedTagIds: prev.selectedTagIds.includes(tagId)
+        ? prev.selectedTagIds.filter(id => id !== tagId)
+        : [...prev.selectedTagIds, tagId]
+    }));
+  };
+
+  // Image viewer handlers
   const handleImageClick = (index) => {
     setCurrentImageIndex(index);
     setShowImageViewer(true);
@@ -373,144 +458,126 @@ const ProjectDetail = () => {
     setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
-  const handleCloseImageViewer = () => {
-    setShowImageViewer(false);
+  // Tag handlers
+  const toggleTagFilter = (tagId) => {
+    setSelectedTagIds(prev =>
+      prev.includes(tagId)
+        ? prev.filter(id => id !== tagId)
+        : [...prev, tagId]
+    );
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (showImageViewer) {
-        if (e.key === 'Escape') {
-          handleCloseImageViewer();
-        } else if (e.key === 'ArrowLeft') {
-          handlePreviousImage();
-        } else if (e.key === 'ArrowRight') {
-          handleNextImage();
-        }
-      }
-    };
+  const handleCreateTag = async (tagData) => {
+    try {
+      await tagAPI.create(id, tagData);
+      const tagsRes = await tagAPI.getByProject(id);
+      setTags(tagsRes.data.tags || []);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showImageViewer, images.length]);
+  const handleUpdateTag = async (tagId, updates) => {
+    try {
+      await tagAPI.update(tagId, updates);
+      const tagsRes = await tagAPI.getByProject(id);
+      setTags(tagsRes.data.tags || []);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
 
-  if (loading) {
-    return <div className="loading">Loading project...</div>;
-  }
+  const handleDeleteTag = async (tagId) => {
+    try {
+      await tagAPI.delete(tagId);
+      const tagsRes = await tagAPI.getByProject(id);
+      setTags(tagsRes.data.tags || []);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
 
-  if (!project) {
-    return <div className="error">Project not found</div>;
-  }
+  // Determine which handler to use for add tag modal
+  const handleAddTag = (tagId) => {
+    if (selectedInsight) {
+      handleAddTagToInsight(tagId);
+    } else if (selectedImage) {
+      handleAddTagToImage(tagId);
+    } else if (selectedDocument) {
+      handleAddTagToDocument(tagId);
+    }
+  };
+
+  const getSelectedItemType = () => {
+    if (selectedInsight) return 'insight';
+    if (selectedImage) return 'image';
+    if (selectedDocument) return 'document';
+    return null;
+  };
+
+  const getSelectedItem = () => {
+    return selectedInsight || selectedImage || selectedDocument;
+  };
+
+  if (loading) return <div className="loading">Loading project...</div>;
+  if (error) return <div className="error">{error}</div>;
+  if (!project) return <div className="error">Project not found</div>;
 
   return (
     <div className="project-detail">
       <div className="project-header">
-        <button onClick={() => navigate('/dashboard')} className="btn-back">
-          ← Back to Projects
-        </button>
-        <div className="project-info">
+        <div>
+          <button onClick={() => navigate('/')} className="btn-back">← Back</button>
           <h1>{project.name}</h1>
+          {project.client && <p className="client-name">Client: {project.client}</p>}
         </div>
         <button onClick={() => setShowCollaboratorModal(true)} className="btn-secondary">
           Manage Collaborators
         </button>
       </div>
 
-      {error && <div className="error">{error}</div>}
-
       <div className="project-content">
-        {/* Left side: Chat */}
-        <div className="chat-section">
-          <div className="stack-tabs">
-            {stacks.length === 0 ? (
-              <div className="empty-stack">
-                <p>No research stacks yet. Use <code>/stack [topic]</code> in chat to create one!</p>
-              </div>
-            ) : (
-              stacks.map((stack) => (
-                <button
-                  key={stack.id}
-                  className={`stack-tab ${currentStack?.id === stack.id ? 'active' : ''}`}
-                  onClick={() => setCurrentStack(stack)}
-                >
-                  {stack.topic}
-                </button>
-              ))
-            )}
-          </div>
+        <ChatSection
+          stacks={stacks}
+          currentStack={currentStack}
+          messages={messages}
+          messageInput={messageInput}
+          textareaRef={textareaRef}
+          messagesEndRef={messagesEndRef}
+          onSelectStack={setCurrentStack}
+          onSendMessage={handleSendMessage}
+          onMessageChange={handleTextareaChange}
+          onKeyDown={handleKeyDown}
+        />
 
-          <div className="chat-messages">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`message ${msg.message_type === 'system' ? 'system' : 'user'}`}
-              >
-                {msg.message_type !== 'system' && (
-                  <span className="message-author">
-                    {msg.username || 'Unknown'}:
-                  </span>
-                )}
-                <span className="message-text">{msg.message}</span>
-                <span className="message-time">
-                  {new Date(msg.created_at).toLocaleTimeString()}
-                </span>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <form onSubmit={handleSendMessage} className="chat-input-form">
-            <textarea
-              ref={textareaRef}
-              value={messageInput}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                currentStack
-                  ? 'Type a message or use /insight [text] to add insight... (Shift+Enter to send)'
-                  : 'Use /stack [topic] to create a research stack... (Shift+Enter to send)'
-              }
-              className="chat-input"
-              rows="1"
-            />
-            <button type="submit" className="btn-primary">
-              Send
-            </button>
-          </form>
-
-          {/*<div className="command-help">
-            <strong>Commands:</strong>
-            <code>/stack [topic]</code> - Create new research stack <br />
-            {currentStack && (
-              <>
-                {' | '}
-                <code>/insight [text]</code> - Add insight<br />
-                {' | '}
-                <code>/image [name]</code> - Upload image<br />
-              </>
-            )}
-          </div>*/}
-        </div>
-
-        {/* Right side: Insights/Images Table */}
         <div className="insights-section">
-            <div className="stack-tabs">
-              <button
-                className={`stack-tab ${activeTab === 'insights' ? 'active' : ''}`}
-                onClick={() => setActiveTab('insights')}
-              >
-                Insights
-              </button>
-              <button
-                className={`stack-tab ${activeTab === 'images' ? 'active' : ''}`}
-                onClick={() => setActiveTab('images')}
-              >
-                Images
-              </button>
-              <button onClick={() => setShowTagModal(true)} className="stack-tab manage-btn">
-                Manage Tags
-              </button>
+          <div className="stack-tabs">
+            <button
+              className={`stack-tab ${activeTab === 'insights' ? 'active' : ''}`}
+              onClick={() => setActiveTab('insights')}
+            >
+              Insights
+            </button>
+            <button
+              className={`stack-tab ${activeTab === 'images' ? 'active' : ''}`}
+              onClick={() => setActiveTab('images')}
+            >
+              Images
+            </button>
+            <button
+              className={`stack-tab ${activeTab === 'documents' ? 'active' : ''}`}
+              onClick={() => setActiveTab('documents')}
+            >
+              Documents
+            </button>
+            <button onClick={() => setShowTagModal(true)} className="stack-tab">
+              Manage Tags
+            </button>
           </div>
+
           <div className="content-section">
             {currentStack && (
               <div className="insights-filters">
@@ -523,455 +590,171 @@ const ProjectDetail = () => {
                     className="search-input"
                   />
                 )}
-                <div className="tag-filters">
-                  <strong>Filter by tags:</strong>
-                  {tags.length === 0 ? (
-                    <span className="no-tags">No tags yet</span>
-                  ) : (
-                    tags.map((tag) => (
-                      <button
-                        key={tag.id}
-                        className={`tag-filter ${selectedTagIds.includes(tag.id) ? 'active' : ''}`}
-                        onClick={() => toggleTagFilter(tag.id)}
-                      >
-                        <ColorSquare color1={tag.color1} color2={tag.color2} size={14} />
-                        <span>{tag.name}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
+                <TagFilters
+                  tags={tags}
+                  selectedTagIds={selectedTagIds}
+                  onToggle={toggleTagFilter}
+                />
               </div>
             )}
           </div>
-            {!currentStack ? (
-              <div className="empty-state">
-                <p>Select or create a research stack to view {activeTab}</p>
-              </div>
-            ) : activeTab === 'insights' ? (
 
-              <div className="insights-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Insight</th>
-                      <th>Tags</th>
-                      <th>Added By</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {insights.map((insight) => (
-                      <tr key={insight.id}>
-                        <td>{insight.content}</td>
-                        <td>
-                          <div className="insight-tags">
-                            {insight.tags?.map((tag) => (
-                              <span key={tag.id} className="tag-badge">
-                                <ColorSquare color1={tag.color1} color2={tag.color2} size={12} />
-                                <span className="tag-name">{tag.name}</span>
-                                <button
-                                  className="tag-remove"
-                                  onClick={() => handleRemoveTagFromInsight(insight.id, tag.id)}
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                            <button
-                              className="add-tag-btn"
-                              onClick={() => {
-                                setSelectedInsight(insight);
-                                setShowAddTagModal(true);
-                              }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </td>
-                        <td>{insight.username}</td>
-                        <td>
-                          <button
-                            onClick={() => handleDeleteInsight(insight.id)}
-                            className="btn-danger-small"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="images-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Image</th>
-                      <th>Name</th>
-                      <th>Tags</th>
-                      <th>Added By</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {images.map((image, index) => (
-                      <tr key={image.id}>
-                        <td>
-                          <img
-                            src={imageAPI.getFileUrl(image.file_path)}
-                            alt={image.name}
-                            className="image-thumbnail"
-                            onClick={() => handleImageClick(index)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </td>
-                        <td>{image.name}</td>
-                        <td>
-                          <div className="insight-tags">
-                            {image.tags?.map((tag) => (
-                              <span key={tag.id} className="tag-badge">
-                                <ColorSquare color1={tag.color1} color2={tag.color2} size={12} />
-                                <span className="tag-name">{tag.name}</span>
-                                <button
-                                  className="tag-remove"
-                                  onClick={() => handleRemoveTagFromImage(image.id, tag.id)}
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                            <button
-                              className="add-tag-btn"
-                              onClick={() => {
-                                setSelectedImage(image);
-                                setShowAddTagModal(true);
-                              }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </td>
-                        <td>{image.username}</td>
-                        <td>
-                          <button
-                            onClick={() => handleDeleteImage(image.id)}
-                            className="btn-danger-small"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            
-            )}
+          {!currentStack ? (
+            <div className="empty-state">
+              <p>Select or create a research stack to view {activeTab}</p>
+            </div>
+          ) : activeTab === 'insights' ? (
+            <InsightsTable
+              insights={insights}
+              onDelete={handleDeleteInsight}
+              onEdit={(insight) => {
+                setSelectedInsight(insight);
+                setShowEditInsightModal(true);
+              }}
+              onAddTag={(insight) => {
+                setSelectedInsight(insight);
+                setShowAddTagModal(true);
+              }}
+              onRemoveTag={handleRemoveTagFromInsight}
+              onLinkDocument={(insight) => {
+                setSelectedInsight(insight);
+                setShowLinkDocumentModal(true);
+              }}
+              onRemoveDocument={handleRemoveDocumentFromInsight}
+            />
+          ) : activeTab === 'images' ? (
+            <ImagesTable
+              images={images}
+              onDelete={handleDeleteImage}
+              onAddTag={(image) => {
+                setSelectedImage(image);
+                setShowAddTagModal(true);
+              }}
+              onRemoveTag={handleRemoveTagFromImage}
+              onImageClick={handleImageClick}
+            />
+          ) : (
+            <DocumentsTable
+              documents={documents}
+              onDelete={handleDeleteDocument}
+              onEdit={(document) => {
+                setSelectedDocument(document);
+                setShowEditDocumentModal(true);
+              }}
+              onAddTag={(document) => {
+                setSelectedDocument(document);
+                setShowAddTagModal(true);
+              }}
+              onRemoveTag={handleRemoveTagFromDocument}
+            />
+          )}
         </div>
       </div>
 
-      {/* Collaborator Modal */}
-      {showCollaboratorModal && (
-        <div className="modal-overlay" onClick={() => setShowCollaboratorModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Manage Collaborators</h2>
+      {/* Modals */}
+      <AddTagModal
+        show={showAddTagModal}
+        onClose={() => {
+          setShowAddTagModal(false);
+          setSelectedInsight(null);
+          setSelectedImage(null);
+          setSelectedDocument(null);
+        }}
+        tags={tags}
+        selectedItem={getSelectedItem()}
+        itemType={getSelectedItemType()}
+        onAddTag={handleAddTag}
+      />
 
-            <div className="collaborators-list">
-              <h3>Current Collaborators</h3>
-              {project.collaborators?.length === 0 ? (
-                <p>No collaborators yet</p>
-              ) : (
-                <ul>
-                  {project.collaborators?.map((collab) => (
-                    <li key={collab.id}>
-                      {collab.first_name} {collab.last_name} ({collab.email})
-                      <button
-                        onClick={() => handleRemoveCollaborator(collab.id)}
-                        className="btn-danger-small"
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+      <UploadImageModal
+        show={showImageUploadModal}
+        onClose={() => {
+          setShowImageUploadModal(false);
+          setImageUploadData({ name: '', file: null, selectedTagIds: [] });
+        }}
+        onSubmit={handleImageUpload}
+        tags={tags}
+        uploadData={imageUploadData}
+        setUploadData={setImageUploadData}
+        onToggleTag={toggleImageTagFilter}
+      />
 
-            <form onSubmit={handleAddCollaborator}>
-              <h3>Add Collaborator</h3>
-              <div className="form-group">
-                <label htmlFor="email">Email Address</label>
-                <input
-                  type="email"
-                  id="email"
-                  value={collaboratorEmail}
-                  onChange={(e) => setCollaboratorEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  onClick={() => setShowCollaboratorModal(false)}
-                  className="btn-secondary"
-                >
-                  Close
-                </button>
-                <button type="submit" className="btn-primary">
-                  Add Collaborator
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      <UploadDocumentModal
+        show={showDocumentUploadModal}
+        onClose={() => {
+          setShowDocumentUploadModal(false);
+          setDocumentUploadData({ name: '', description: '', file: null, selectedTagIds: [] });
+        }}
+        onSubmit={handleDocumentUpload}
+        tags={tags}
+        uploadData={documentUploadData}
+        setUploadData={setDocumentUploadData}
+        onToggleTag={toggleDocumentTagFilter}
+      />
+
+      <LinkDocumentModal
+        show={showLinkDocumentModal}
+        onClose={() => {
+          setShowLinkDocumentModal(false);
+          setSelectedInsight(null);
+        }}
+        documents={documents}
+        selectedInsight={selectedInsight}
+        onLinkDocument={handleLinkDocumentToInsight}
+      />
+
+      {showEditInsightModal && (
+        <EditInsightModal
+          insight={selectedInsight}
+          onClose={() => {
+            setShowEditInsightModal(false);
+            setSelectedInsight(null);
+          }}
+          onSave={handleEditInsight}
+        />
       )}
 
-      {/* Tag Management Modal */}
-      {showTagModal && (
-        <div className="modal-overlay" onClick={() => setShowTagModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Manage Tags</h2>
-
-            <div className="tags-list">
-              <h3>Project Tags</h3>
-              {tags.length === 0 ? (
-                <p>No tags yet</p>
-              ) : (
-                <div className="tag-grid">
-                  {tags.map((tag) => (
-                    <div key={tag.id} className="tag-item">
-                      <span className="tag-badge">
-                        <ColorSquare color1={tag.color1} color2={tag.color2} size={14} />
-                        <span className="tag-name">{tag.name}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <form onSubmit={handleCreateTag}>
-              <h3>Create New Tag</h3>
-              <div className="form-group">
-                <label htmlFor="tagName">Tag Name</label>
-                <input
-                  type="text"
-                  id="tagName"
-                  value={newTag.name}
-                  onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Primary Color</label>
-                <div className="color-palette">
-                  {COLOR_PALETTE.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      className={`palette-color ${newTag.color1 === color.value ? 'selected' : ''}`}
-                      style={{ backgroundColor: color.value }}
-                      onClick={() => setNewTag({ ...newTag, color1: color.value })}
-                      title={color.name}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Secondary Color (optional)</label>
-                <div className="color-palette">
-                  <button
-                    type="button"
-                    className={`palette-color ${!newTag.color2 ? 'selected' : ''}`}
-                    style={{ backgroundColor: '#fff', border: '2px solid #000' }}
-                    onClick={() => setNewTag({ ...newTag, color2: null })}
-                    title="None"
-                  >
-                    ×
-                  </button>
-                  {COLOR_PALETTE.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      className={`palette-color ${newTag.color2 === color.value ? 'selected' : ''}`}
-                      style={{ backgroundColor: color.value }}
-                      onClick={() => setNewTag({ ...newTag, color2: color.value })}
-                      title={color.name}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Preview</label>
-                <div className="tag-preview">
-                  <ColorSquare color1={newTag.color1} color2={newTag.color2} size={20} />
-                  <span>{newTag.name || 'Tag Name'}</span>
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  onClick={() => setShowTagModal(false)}
-                  className="btn-secondary"
-                >
-                  Close
-                </button>
-                <button type="submit" className="btn-primary">
-                  Create Tag
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {showEditDocumentModal && (
+        <EditDocumentModal
+          document={selectedDocument}
+          onClose={() => {
+            setShowEditDocumentModal(false);
+            setSelectedDocument(null);
+          }}
+          onSave={handleEditDocument}
+        />
       )}
 
-      {/* Image Upload Modal */}
-      {showImageUploadModal && (
-        <div className="modal-overlay" onClick={() => setShowImageUploadModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Upload Image</h2>
-            <form onSubmit={handleImageUpload}>
-              <div className="form-group">
-                <label htmlFor="imageName">Image Name</label>
-                <input
-                  type="text"
-                  id="imageName"
-                  value={imageUploadData.name}
-                  onChange={(e) => setImageUploadData({ ...imageUploadData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="imageFile">Select Image</label>
-                <input
-                  type="file"
-                  id="imageFile"
-                  accept="image/*"
-                  onChange={(e) => setImageUploadData({ ...imageUploadData, file: e.target.files[0] })}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Tags (optional)</label>
-                <div className="tag-selection">
-                  {tags.length === 0 ? (
-                    <span className="no-tags">No tags available</span>
-                  ) : (
-                    tags.map((tag) => (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        className={`tag-badge selectable ${imageUploadData.selectedTagIds.includes(tag.id) ? 'active' : ''}`}
-                        onClick={() => toggleImageTagFilter(tag.id)}
-                      >
-                        <ColorSquare color1={tag.color1} color2={tag.color2} size={14} />
-                        <span className="tag-name">{tag.name}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowImageUploadModal(false);
-                    setImageUploadData({ name: '', file: null, selectedTagIds: [] });
-                  }}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  Upload
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ManageTagsModal
+        show={showTagModal}
+        onClose={() => setShowTagModal(false)}
+        tags={tags}
+        onCreateTag={handleCreateTag}
+        onUpdateTag={handleUpdateTag}
+        onDeleteTag={handleDeleteTag}
+      />
 
-      {/* Add Tag Modal (for both Insights and Images) */}
-      {showAddTagModal && (selectedInsight || selectedImage) && (
-        <div className="modal-overlay" onClick={() => setShowAddTagModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Add Tag to {selectedInsight ? 'Insight' : 'Image'}</h2>
-            {selectedInsight && (
-              <p className="modal-subtitle">{selectedInsight.content.substring(0, 100)}...</p>
-            )}
-            {selectedImage && (
-              <p className="modal-subtitle">{selectedImage.name}</p>
-            )}
+      <ManageCollaboratorsModal
+        show={showCollaboratorModal}
+        onClose={() => setShowCollaboratorModal(false)}
+        projectId={id}
+        projectAPI={projectAPI}
+      />
 
-            {tags.length === 0 ? (
-              <div className="empty-state">
-                <p>No tags available. Create tags first!</p>
-              </div>
-            ) : (
-              <div className="tag-selection">
-                {tags
-                  .filter(tag => {
-                    const currentTags = selectedInsight ? selectedInsight.tags : selectedImage.tags;
-                    return !currentTags?.some(t => t.id === tag.id);
-                  })
-                  .map((tag) => (
-                    <button
-                      key={tag.id}
-                      className="tag-badge selectable"
-                      onClick={() => selectedInsight ? handleAddTagToInsight(tag.id) : handleAddTagToImage(tag.id)}
-                    >
-                      <ColorSquare color1={tag.color1} color2={tag.color2} size={14} />
-                      <span className="tag-name">{tag.name}</span>
-                    </button>
-                  ))}
-                {tags.every(tag => {
-                  const currentTags = selectedInsight ? selectedInsight.tags : selectedImage.tags;
-                  return currentTags?.some(t => t.id === tag.id);
-                }) && (
-                  <p>All tags have been added</p>
-                )}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddTagModal(false);
-                  setSelectedInsight(null);
-                  setSelectedImage(null);
-                }}
-                className="btn-secondary"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Image Viewer Lightbox */}
-      {showImageViewer && images.length > 0 && (
-        <div className="lightbox-overlay" onClick={handleCloseImageViewer}>
-          <button className="lightbox-close" onClick={handleCloseImageViewer}>
-            ×
-          </button>
-          <button className="lightbox-nav lightbox-prev" onClick={(e) => { e.stopPropagation(); handlePreviousImage(); }}>
-            ←
-          </button>
-          <button className="lightbox-nav lightbox-next" onClick={(e) => { e.stopPropagation(); handleNextImage(); }}>
-            →
-          </button>
-          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+      {/* Image Viewer Modal */}
+      {showImageViewer && (
+        <div className="modal-overlay" onClick={() => setShowImageViewer(false)}>
+          <div className="image-viewer-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="close-viewer" onClick={() => setShowImageViewer(false)}>×</button>
+            <button className="nav-button prev" onClick={handlePreviousImage}>‹</button>
             <img
-              src={imageAPI.getFileUrl(images[currentImageIndex].file_path)}
-              alt={images[currentImageIndex].name}
-              className="lightbox-image"
+              src={imageAPI.getFileUrl(images[currentImageIndex]?.file_path)}
+              alt={images[currentImageIndex]?.name}
+              className="viewer-image"
             />
-            <div className="lightbox-info">
-              <p className="lightbox-name">{images[currentImageIndex].name}</p>
-              <p className="lightbox-counter">{currentImageIndex + 1} / {images.length}</p>
+            <button className="nav-button next" onClick={handleNextImage}>›</button>
+            <div className="image-info">
+              {images[currentImageIndex]?.name}
             </div>
           </div>
         </div>

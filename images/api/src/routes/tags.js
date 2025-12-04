@@ -27,6 +27,16 @@ router.post('/project/:projectId',
   })
 );
 
+// Update tag
+router.put('/:id',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { name, color1, color2 } = req.body;
+    const result = await tagService.updateTag(req.params.id, req.user.id, { name, color1, color2 });
+    successResponse(res, { tag: result });
+  })
+);
+
 // Delete tag
 router.delete('/:id',
   authenticateToken,
