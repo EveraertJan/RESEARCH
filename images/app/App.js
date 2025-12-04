@@ -8,6 +8,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import ProjectDetailScreen from './src/screens/ProjectDetailScreen';
+import ChatScreen from './src/screens/ChatScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -41,6 +42,11 @@ export default function App() {
             name="ProjectDetail"
             component={ProjectDetailScreen}
             options={{ title: 'Project Details' }}
+          />
+          <Stack.Screen
+            name="Chat"
+            component={ChatScreen}
+            options={{ title: 'Chat' }}
           />
         </Stack.Navigator>
         <StatusBar style="auto" />
