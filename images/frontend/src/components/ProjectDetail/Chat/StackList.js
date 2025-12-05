@@ -2,7 +2,7 @@ import React from 'react';
 
 const StackList = ({ stacks, currentStack, onSelectStack }) => {
   return (
-    <div className="stack-list">
+    <div className="stack-list" style={{padding: "10px", paddingTop: "0px", display: 'flex', gap: "10px"}}>
       {stacks.map((stack) => (
         <button
           key={stack.id}

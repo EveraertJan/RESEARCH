@@ -4,12 +4,23 @@
   box-sizing: border-box;
 }
 
+:root {
+  --background-color: #ffffff;
+  --text-color: #1a1a1a;
+  --secondary-color: #666666;
+  --border-color: #e0e0e0;
+  --hover-color: #f5f5f5;
+  --accent-color: #7a00df;
+  --font-mono: 'Courier New', 'Courier', monospace;
+}
+
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-mono);
   font-size: 14px;
-  line-height: 1.5;
-  color: #000;
-  background: #fff;
+  line-height: 1.6;
+  color: var(--text-color);
+  background: var(--background-color);
+  letter-spacing: -0.01em;
 }
 
 .App {
