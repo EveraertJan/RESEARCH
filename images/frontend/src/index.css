@@ -207,6 +207,44 @@ button:disabled {
   height: 50px;
 }
 
+.view-toggle {
+  display: none;
+  gap: 0;
+  margin-bottom: 10px;
+}
+
+.view-toggle-btn {
+  flex: 1;
+  padding: 8px 16px;
+  border: 1px solid #000;
+  background: #fff;
+  cursor: pointer;
+  border-right: none;
+}
+
+.view-toggle-btn:last-child {
+  border-right: 1px solid #000;
+}
+
+.view-toggle-btn.active {
+  background: #000;
+  color: #fff;
+}
+
+.btn-settings {
+  background: #fff;
+  border: 1px solid #000;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.btn-settings:hover {
+  background: #000;
+  color: #fff;
+}
+
 .project-content {
   display: grid;
   grid-template-columns: 600px 1fr;
@@ -302,6 +340,65 @@ button:disabled {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+/* Settings Section */
+.settings-section-container {
+  background: #fff;
+  overflow-y: auto;
+  display: none;
+  flex-direction: column;
+}
+
+.modal-body .settings-section-container {
+  display: flex;
+  padding: 0;
+}
+
+.settings-section-container.active {
+  padding: 20px;
+}
+
+.settings-content-wrapper {
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.settings-item {
+  border: 1px solid #000;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.settings-item h3 {
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.settings-description {
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.storage-display {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px;
+  background: #f5f5f5;
+  border: 1px solid #000;
+}
+
+.storage-amount {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.storage-label {
+  font-size: 12px;
+  color: #666;
 }
 .manage-btn {
   margin-left: calc(100% - 265px);
@@ -593,6 +690,17 @@ table, th, td {
 /* Tag Name */
 .tag-name {
   margin-left: 3px;
+}
+
+@media (max-width: 1400px) {
+  .tag-name {
+    display: none;
+  }
+
+  .tag-badge:hover .tag-name,
+  .tag-filter:hover .tag-name {
+    display: inline;
+  }
 }
 
 /* Tag Filter with Color Square */
@@ -917,11 +1025,54 @@ table, th, td {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .project-content {
-    grid-template-columns: 1fr;
+@media (min-width: 1401px) {
+  /* On large screens, hide settings button and show settings in modal instead */
+  .btn-settings {
+    display: block;
   }
 
+  .view-toggle {
+    display: none;
+  }
+
+  .settings-section-container {
+    display: none;
+  }
+}
+
+@media (max-width: 1400px) {
+  /* Hide settings button on small screens, show in tabs instead */
+  .btn-settings {
+    display: none;
+  }
+
+  .view-toggle {
+    display: flex;
+  }
+
+  .project-content {
+    grid-template-columns: 1fr;
+    position: relative;
+  }
+
+  .chat-section,
+  .insights-section,
+  .settings-section-container {
+    display: none;
+  }
+
+  .chat-section.active,
+  .insights-section.active,
+  .settings-section-container.active {
+    display: flex;
+  }
+
+  .chat-section {
+    border-right: none;
+  }
+}
+
+@media (max-width: 768px) {
   .chat-section {
     min-height: 400px;
   }

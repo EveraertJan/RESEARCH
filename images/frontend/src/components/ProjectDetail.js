@@ -4,6 +4,7 @@ import { projectAPI, stackAPI, chatAPI, insightAPI, tagAPI, imageAPI, documentAP
 
 // Import components
 import ChatSection from './ProjectDetail/Chat/ChatSection';
+import SettingsSection from './ProjectDetail/Settings/SettingsSection';
 import InsightsTable from './ProjectDetail/Tables/InsightsTable';
 import ImagesTable from './ProjectDetail/Tables/ImagesTable';
 import DocumentsTable from './ProjectDetail/Tables/DocumentsTable';
@@ -46,6 +47,8 @@ const ProjectDetail = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTagIds, setSelectedTagIds] = useState([]);
   const [activeTab, setActiveTab] = useState('insights');
+  const [activeView, setActiveView] = useState('chat'); // 'chat', 'content', or 'settings'
+  const [storageUsed, setStorageUsed] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -59,6 +62,7 @@ const ProjectDetail = () => {
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [showEditInsightModal, setShowEditInsightModal] = useState(false);
   const [showEditDocumentModal, setShowEditDocumentModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Selected items
   const [selectedInsight, setSelectedInsight] = useState(null);
@@ -128,12 +132,35 @@ const ProjectDetail = () => {
         setCurrentStack(stacksRes.data.stacks[0]);
       }
 
+      // Calculate storage from project data if available
+      if (projectRes.data.project.storage_used) {
+        setStorageUsed(projectRes.data.project.storage_used);
+      }
+
       setLoading(false);
     } catch (err) {
       setError(err.message);
       setLoading(false);
     }
   };
+
+  const calculateStorage = () => {
+    // Calculate storage from images and documents
+    let total = 0;
+    images.forEach(img => {
+      if (img.file_size) total += img.file_size;
+    });
+    documents.forEach(doc => {
+      if (doc.file_size) total += doc.file_size;
+    });
+    setStorageUsed(total);
+  };
+
+  useEffect(() => {
+    if (images.length > 0 || documents.length > 0) {
+      calculateStorage();
+    }
+  }, [images, documents]);
 
   const fetchMessages = async () => {
     if (!currentStack) return;
@@ -529,13 +556,38 @@ const ProjectDetail = () => {
   return (
     <div className="project-detail">
       <div className="project-header">
-        <div>
+        <div style={{display: 'flex', flexDirection: 'row', gap: '20px', alignItems: 'center'}}>
           <button onClick={() => navigate('/')} className="btn-back">← Back</button>
           <h1>{project.name}</h1>
           {project.client && <p className="client-name">Client: {project.client}</p>}
         </div>
-        <button onClick={() => setShowCollaboratorModal(true)} className="btn-secondary">
-          Manage Collaborators
+        <button
+          onClick={() => setShowSettingsModal(true)}
+          className="btn-settings"
+          title="Settings"
+        >
+          ⚙
+        </button>
+      </div>
+
+      <div className="view-toggle">
+        <button
+          className={`view-toggle-btn ${activeView === 'chat' ? 'active' : ''}`}
+          onClick={() => setActiveView('chat')}
+        >
+          Chat
+        </button>
+        <button
+          className={`view-toggle-btn ${activeView === 'content' ? 'active' : ''}`}
+          onClick={() => setActiveView('content')}
+        >
+          Content
+        </button>
+        <button
+          className={`view-toggle-btn ${activeView === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveView('settings')}
+        >
+          Settings
         </button>
       </div>
 
@@ -551,9 +603,10 @@ const ProjectDetail = () => {
           onSendMessage={handleSendMessage}
           onMessageChange={handleTextareaChange}
           onKeyDown={handleKeyDown}
+          className={activeView === 'chat' ? 'active' : ''}
         />
 
-        <div className="insights-section">
+        <div className={`insights-section ${activeView === 'content' ? 'active' : ''}`}>
           <div className="stack-tabs">
             <button
               className={`stack-tab ${activeTab === 'insights' ? 'active' : ''}`}
@@ -649,6 +702,19 @@ const ProjectDetail = () => {
             />
           )}
         </div>
+
+        <SettingsSection
+          projectId={id}
+          projectAPI={projectAPI}
+          tags={tags}
+          onCreateTag={handleCreateTag}
+          onUpdateTag={handleUpdateTag}
+          onDeleteTag={handleDeleteTag}
+          onShowCollaboratorModal={() => setShowCollaboratorModal(true)}
+          onShowTagModal={() => setShowTagModal(true)}
+          storageUsed={storageUsed}
+          className={activeView === 'settings' ? 'active' : ''}
+        />
       </div>
 
       {/* Modals */}
@@ -740,6 +806,37 @@ const ProjectDetail = () => {
         projectId={id}
         projectAPI={projectAPI}
       />
+
+      {/* Settings Modal for Large Screens */}
+      {showSettingsModal && (
+        <div className="modal-overlay" onClick={() => setShowSettingsModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Settings</h3>
+              <button className="modal-close" onClick={() => setShowSettingsModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <SettingsSection
+                projectId={id}
+                projectAPI={projectAPI}
+                tags={tags}
+                onCreateTag={handleCreateTag}
+                onUpdateTag={handleUpdateTag}
+                onDeleteTag={handleDeleteTag}
+                onShowCollaboratorModal={() => {
+                  setShowSettingsModal(false);
+                  setShowCollaboratorModal(true);
+                }}
+                onShowTagModal={() => {
+                  setShowSettingsModal(false);
+                  setShowTagModal(true);
+                }}
+                storageUsed={storageUsed}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Image Viewer Modal */}
       {showImageViewer && (

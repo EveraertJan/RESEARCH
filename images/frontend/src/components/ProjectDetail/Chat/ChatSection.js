@@ -13,10 +13,11 @@ const ChatSection = ({
   onSelectStack,
   onSendMessage,
   onMessageChange,
-  onKeyDown
+  onKeyDown,
+  className = ''
 }) => {
   return (
-    <div className="chat-section">
+    <div className={`chat-section ${className}`}>
       <div className="stack-header" style={{padding: "10px", paddingBottom: '0px'}}>
         <h3>Research Stacks</h3>
       </div>
