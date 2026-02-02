@@ -44,7 +44,7 @@ function init() {
     el.setAttribute("hitY", 0);
   
     h_ctx.filter = "blur(10px);"
-    el.addEventListener("mousedown", (e) => {
+    el.addEventListener("pointerdown", (e) => {
       el.setAttribute("dragged", true);
 
       if(parseInt(el.getAttribute("hitY")) == 0) {
@@ -103,7 +103,7 @@ function init() {
 
 
 
-  document.addEventListener("mouseup", (e) => {
+  document.addEventListener("pointerup", (e) => {
     
     const active = document.querySelectorAll('[dragged=true]')
     active.forEach((el) =>{
@@ -114,7 +114,7 @@ function init() {
     a_ctx.clearRect(0, 0, canvas.width, canvas.height)
 
   })
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     const active = document.querySelectorAll('[dragged=true]')
     active.forEach((el) => {
       let y = (parseInt(el.getAttribute("hitY")) + e.clientY);
