@@ -35,16 +35,21 @@ function init() {
 
   localStorage.setItem("uid", uuidv4());
 
-  const el = document.querySelectorAll('[drag_active]')
+  const els = document.querySelectorAll('[drag_active]')
 
-  el.forEach((el, i) => {
+
+  els.forEach((el, i) => {
     const active = document.querySelectorAll('[dragged=true]')
     el.setAttribute("dragged", false);
     el.setAttribute("hitX", 0);
     el.setAttribute("hitY", 0);
   
     h_ctx.filter = "blur(10px);"
-    el.addEventListener("pointerdown", (e) => {
+
+
+
+    const handleMouseDown = (e) => {
+
       el.setAttribute("dragged", true);
 
       if(parseInt(el.getAttribute("hitY")) == 0) {
@@ -98,8 +103,12 @@ function init() {
         }
       }
 
+    }
+    el.addEventListener("pointerdown", (e) => {
+      handleMouseDown(e)
     })
   })
+
 
 
 
